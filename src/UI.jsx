@@ -1,7 +1,6 @@
 import React from 'react'
 
 export default function UI({ setActiveColor, activeColor }) {
-    // Array of your selected high-contrast colors
     const colors = [
         { name: 'Racing Red', hex: '#FF2A2A' },
         { name: 'Electric Cyan', hex: '#00E5FF' },
@@ -11,64 +10,54 @@ export default function UI({ setActiveColor, activeColor }) {
     ];
 
     return (
-        <div style={{
-            position: 'absolute',
-            // Desktop: Middle-Left | Mobile: Bottom-Center
-            top: window.innerWidth < 768 ? 'auto' : '50%',
-            bottom: window.innerWidth < 768 ? '20px' : 'auto',
-            left: window.innerWidth < 768 ? '50%' : '40px',
-            transform: window.innerWidth < 768 ? 'translateX(-50%)' : 'translateY(-50%)',
-            zIndex: 10,
-            display: 'flex',
-            flexDirection: window.innerWidth < 768 ? 'row' : 'column', // Horizontal on mobile
-            overflowX: 'auto', // Allow swiping through colors on small screens
-            maxWidth: '90vw',
-            // Rest of your existing glassmorphism styles...
-            background: 'rgba(25, 25, 25, 0.6)',
-            backdropFilter: 'blur(12px)',
-            padding: '20px',
-            borderRadius: '16px',
-            gap: '15px'
-        }}>
-            <div>
-                <h2 style={{ color: '#ffffff', fontFamily: 'sans-serif', margin: '0', fontSize: '1.4rem', fontWeight: '400', letterSpacing: '3px', textTransform: 'uppercase' }}>
-                    Edifice
-                </h2>
-                <p style={{ color: '#888888', fontFamily: 'sans-serif', margin: '5px 0 0 0', fontSize: '0.75rem', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                    Select Edition
-                </p>
+        <>
+            {/* Minimalist Top Branding */}
+            <div style={{ position: 'absolute', top: '40px', left: '40px', zIndex: 10 }}>
+                <h1 style={{ color: '#fff', fontSize: '1.2rem', letterSpacing: '4px', textTransform: 'uppercase', margin: 0, fontWeight: '300', fontFamily: 'sans-serif' }}>
+                    Edifice <span style={{ fontWeight: '800', opacity: 0.5 }}>Configurator</span>
+                </h1>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '10px' }}>
+            {/* Bottom Floating Control Bar */}
+            <div style={{
+                position: 'absolute',
+                bottom: '40px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '20px',
+                background: 'rgba(10, 10, 10, 0.6)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                padding: '12px 25px',
+                borderRadius: '50px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+                width: 'fit-content',
+                maxWidth: '90vw'
+            }}>
                 {colors.map((color) => (
-                    <div
+                    <button
                         key={color.name}
-                        style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer', group: 'hover' }}
                         onClick={() => setActiveColor(color.hex)}
-                    >
-                        {/* Circular Color Swatch */}
-                        <div style={{
-                            width: '22px',
-                            height: '22px',
+                        title={color.name}
+                        style={{
+                            width: '32px',
+                            height: '32px',
                             borderRadius: '50%',
                             backgroundColor: color.hex,
-                            boxShadow: activeColor === color.hex ? `0 0 12px ${color.hex}` : 'none',
-                            border: activeColor === color.hex ? '2px solid #ffffff' : '2px solid transparent',
-                            transition: 'all 0.3s ease'
-                        }} />
-                        {/* Label */}
-                        <span style={{
-                            color: activeColor === color.hex ? '#ffffff' : '#777777',
-                            fontFamily: 'sans-serif',
-                            fontSize: '0.85rem',
-                            fontWeight: activeColor === color.hex ? '600' : '400',
-                            transition: 'color 0.3s ease'
-                        }}>
-                            {color.name}
-                        </span>
-                    </div>
+                            border: activeColor === color.hex ? '3px solid white' : '2px solid rgba(255,255,255,0.2)',
+                            cursor: 'pointer',
+                            padding: 0,
+                            transform: activeColor === color.hex ? 'scale(1.2)' : 'scale(1)',
+                            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                            boxShadow: activeColor === color.hex ? `0 0 15px ${color.hex}` : 'none'
+                        }}
+                    />
                 ))}
             </div>
-        </div>
+        </>
     )
 }

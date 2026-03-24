@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 export function Model({ accentColor = "#00E5FF", ...props }) {
-  const { nodes, materials } = useGLTF('/watch.glb')
+  const { nodes, materials } = useGLTF('./watch-opt.glb', true)
 
   // 1. Create ONE single material instance for performance
   const accentMaterial = useMemo(() => new THREE.MeshStandardMaterial({
