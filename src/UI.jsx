@@ -13,20 +13,22 @@ export default function UI({ setActiveColor, activeColor }) {
     return (
         <div style={{
             position: 'absolute',
-            top: '50%',
-            left: '40px',
-            transform: 'translateY(-50%)',
+            // Desktop: Middle-Left | Mobile: Bottom-Center
+            top: window.innerWidth < 768 ? 'auto' : '50%',
+            bottom: window.innerWidth < 768 ? '20px' : 'auto',
+            left: window.innerWidth < 768 ? '50%' : '40px',
+            transform: window.innerWidth < 768 ? 'translateX(-50%)' : 'translateY(-50%)',
             zIndex: 10,
             display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-            background: 'rgba(25, 25, 25, 0.4)', // Dark glass effect
+            flexDirection: window.innerWidth < 768 ? 'row' : 'column', // Horizontal on mobile
+            overflowX: 'auto', // Allow swiping through colors on small screens
+            maxWidth: '90vw',
+            // Rest of your existing glassmorphism styles...
+            background: 'rgba(25, 25, 25, 0.6)',
             backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            padding: '30px',
+            padding: '20px',
             borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 4px 30px rgba(0, 0, 0, 0.5)'
+            gap: '15px'
         }}>
             <div>
                 <h2 style={{ color: '#ffffff', fontFamily: 'sans-serif', margin: '0', fontSize: '1.4rem', fontWeight: '400', letterSpacing: '3px', textTransform: 'uppercase' }}>
