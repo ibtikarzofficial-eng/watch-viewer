@@ -25,7 +25,7 @@ export default function UI({ setActiveColor, activeColor, viewCamera }) {
         <>
             <div style={{ position: 'absolute', top: '40px', left: '40px', zIndex: 10 }}>
                 <h1 style={{ color: '#fff', fontSize: '1.2rem', letterSpacing: '4px', textTransform: 'uppercase', margin: 0, fontWeight: '300', fontFamily: 'sans-serif' }}>
-                    Edifice <span style={{ fontWeight: '800', opacity: 0.5 }}>Configurator v0.0.1</span>
+                    Edifice <span style={{ fontWeight: '800', opacity: 0.5 }}>Configurator v0.0.2</span>
                 </h1>
             </div>
 
