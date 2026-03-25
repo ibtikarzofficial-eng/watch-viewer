@@ -2,13 +2,60 @@ import { Suspense, useState, useRef } from 'react'
 import './App.css'
 import { Canvas } from '@react-three/fiber'
 import { Environment, OrbitControls } from '@react-three/drei'
-import { createXRStore, XR } from '@react-three/xr'
 import gsap from 'gsap'
 import CanvasLoader from './CanvasLoader'
 import { Model as WatchModel } from './WatchModel'
 import UI from './UI'
+import { createXRStore, XR, useHitTest } from '@react-three/xr'
 
 const store = createXRStore()
+
+// THE NEW AR ENGINE: Handles floor scanning and placing
+function ARScanner({ activeColor }) {
+  const reticleRef = useRef()
+  const [placedPos, setPlacedPos] = useState(null)
+
+  // This hook asks the phone's camera to find flat surfaces (floors/tables)
+  useHitTest((hitMatrix) => {
+    if (!placedPos && reticleRef.current) {
+      hitMatrix.decompose(
+        reticleRef.current.position,
+        reticleRef.current.quaternion,
+        reticleRef.current.scale
+      )
+    }
+  })
+
+  // When the user taps the screen, drop the watch at the ring's physical location
+  const placeWatch = () => {
+    if (!placedPos && reticleRef.current) {
+      setPlacedPos([
+        reticleRef.current.position.x,
+        reticleRef.current.position.y,
+        reticleRef.current.position.z
+      ])
+    }
+  }
+
+  return (
+    <group onPointerDown={placeWatch}>
+      {/* 1. The Targeting Ring (Only shows before placing) */}
+      {!placedPos && (
+        <mesh ref={reticleRef} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.08, 0.1, 32]} />
+          <meshBasicMaterial color="#00E5FF" />
+        </mesh>
+      )}
+
+      {/* 2. The Watch (Only shows AFTER tapping the screen) */}
+      {placedPos && (
+        <group position={placedPos} scale={[0.15, 0.15, 0.15]}>
+          <WatchModel position={[0, 0, 0]} accentColor={activeColor} />
+        </group>
+      )}
+    </group>
+  )
+}
 
 function App() {
   const [activeColor, setActiveColor] = useState('#00E5FF')
@@ -80,21 +127,8 @@ function App() {
           <Environment preset='city' environmentIntensity={1.2} />
 
           <Suspense fallback={<CanvasLoader />}>
-            {/* ANCHOR POINT: 0.5 meters exactly in front of your phone camera */}
-            <group position={[0, 0, -0.5]}>
-
-              {/* THE DEBUG CUBE: This proves if the AR positioning is working */}
-              <mesh position={[0.2, 0, 0]} scale={[0.05, 0.05, 0.05]}>
-                <boxGeometry />
-                <meshBasicMaterial color="#FF0000" />
-              </mesh>
-
-              {/* THE WATCH */}
-              <group scale={[0.15, 0.15, 0.15]}>
-                <WatchModel position={[0, 0, 0]} accentColor={activeColor} />
-              </group>
-
-            </group>
+            {/* The Scanner replaces the static watch */}
+            <ARScanner activeColor={activeColor} />
           </Suspense>
         </XR>
       </Canvas>
