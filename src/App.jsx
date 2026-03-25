@@ -8,14 +8,15 @@ import { Model as WatchModel } from './WatchModel'
 import UI from './UI'
 import { createXRStore, XR, useHitTest } from '@react-three/xr'
 
-const store = createXRStore()
+const store = createXRStore({
+  sessionInit: { requiredFeatures: ['hit-test'] }
+})
 
-// THE NEW AR ENGINE: Handles floor scanning and placing
+// THE AR ENGINE
 function ARScanner({ activeColor }) {
   const reticleRef = useRef()
   const [placedPos, setPlacedPos] = useState(null)
 
-  // This hook asks the phone's camera to find flat surfaces (floors/tables)
   useHitTest((hitMatrix) => {
     if (!placedPos && reticleRef.current) {
       hitMatrix.decompose(
@@ -26,7 +27,6 @@ function ARScanner({ activeColor }) {
     }
   })
 
-  // When the user taps the screen, drop the watch at the ring's physical location
   const placeWatch = () => {
     if (!placedPos && reticleRef.current) {
       setPlacedPos([
@@ -39,15 +39,12 @@ function ARScanner({ activeColor }) {
 
   return (
     <group onPointerDown={placeWatch}>
-      {/* 1. The Targeting Ring (Only shows before placing) */}
       {!placedPos && (
         <mesh ref={reticleRef} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.08, 0.1, 32]} />
           <meshBasicMaterial color="#00E5FF" />
         </mesh>
       )}
-
-      {/* 2. The Watch (Only shows AFTER tapping the screen) */}
       {placedPos && (
         <group position={placedPos} scale={[0.15, 0.15, 0.15]}>
           <WatchModel position={[0, 0, 0]} accentColor={activeColor} />
@@ -59,6 +56,8 @@ function ARScanner({ activeColor }) {
 
 function App() {
   const [activeColor, setActiveColor] = useState('#00E5FF')
+  // NEW: State to track if we are in AR mode or Web mode
+  const [isAR, setIsAR] = useState(false)
   const controlsRef = useRef()
 
   const viewCamera = (view) => {
@@ -81,11 +80,20 @@ function App() {
     })
   }
 
+  // The AR Trigger Logic
+  const handleEnterAR = () => {
+    setIsAR(true); // Switch the canvas to AR mode
+    store.enterAR().catch(() => {
+      // If AR fails or user cancels, switch back to normal web view
+      setIsAR(false);
+    });
+  };
+
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
 
       <button
-        onClick={() => store.enterAR()}
+        onClick={handleEnterAR}
         style={{
           position: 'absolute',
           bottom: '35%',
@@ -119,7 +127,6 @@ function App() {
             enablePan={false}
           />
 
-          {/* THE AR LIFESAVER: Raw lighting that cannot fail in WebXR */}
           <ambientLight intensity={2.5} />
           <directionalLight position={[5, 10, 5]} intensity={4} />
           <directionalLight position={[-5, -5, -5]} intensity={2} />
@@ -127,8 +134,12 @@ function App() {
           <Environment preset='city' environmentIntensity={1.2} />
 
           <Suspense fallback={<CanvasLoader />}>
-            {/* The Scanner replaces the static watch */}
-            <ARScanner activeColor={activeColor} />
+            {/* THE HYBRID TOGGLE: Shows the AR scanner ONLY if they clicked the button. Otherwise, shows the normal watch. */}
+            {isAR ? (
+              <ARScanner activeColor={activeColor} />
+            ) : (
+              <WatchModel position={[0, 0.35, 0]} accentColor={activeColor} />
+            )}
           </Suspense>
         </XR>
       </Canvas>
