@@ -10,13 +10,7 @@ import UI from './UI'
 import { createXRStore, XR, useXRHitTest } from '@react-three/xr'
 
 // 1. THE DOM OVERLAY FIX: This forces the browser to show your HTML toasts over the AR camera
-const store = createXRStore({
-  sessionInit: {
-    requiredFeatures: ['hit-test'],
-    optionalFeatures: ['dom-overlay'],
-    domOverlay: { root: document.body }
-  }
-})
+const store = createXRStore()
 
 function ARScanner({ activeColor, setToast }) {
   const reticleRef = useRef()
@@ -91,11 +85,18 @@ function App() {
 
   const handleEnterAR = () => {
     setIsAR(true);
-    setToast("STARTING AR...");
+    setToast("STARTING CAMERA... Please wait.");
 
-    store.enterAR().catch(() => {
+    // Pass the config HERE, when we know the DOM is ready
+    store.enterAR({
+      requiredFeatures: ['hit-test'],
+      optionalFeatures: ['dom-overlay'],
+      domOverlay: { root: document.getElementById('root') }
+    }).catch((err) => {
+      console.error("AR Failed:", err);
       setIsAR(false);
-      setToast("");
+      setToast("AR Not Supported on this device.");
+      setTimeout(() => setToast(""), 3000);
     });
   };
 
