@@ -1,4 +1,4 @@
-import { Suspense, useState, useRef } from 'react'
+import { Suspense, useState, useRef, useMemo } from 'react'
 import * as THREE from 'three'
 import './App.css'
 import { Canvas } from '@react-three/fiber'
@@ -9,7 +9,7 @@ import { Model as WatchModel } from './WatchModel'
 import UI from './UI'
 import { createXRStore, XR, useXRHitTest } from '@react-three/xr'
 
-// 1. PURE AR ENGINE: No domOverlay to crash the Android camera
+// 1. PURE XR STORE: No DOM Overlays to crash your Android device
 const store = createXRStore()
 
 function ARScanner({ activeColor }) {
@@ -17,16 +17,24 @@ function ARScanner({ activeColor }) {
   const watchGroupRef = useRef()
   const [isPlaced, setIsPlaced] = useState(false)
 
-  // 2. FIXED MATH: Simplified the hit matrix to prevent crashes
-  useXRHitTest((hitMatrix) => {
+  const matrixHelper = useMemo(() => new THREE.Matrix4(), [])
+
+  // 2. THE HIT TESTER: Scans the physical floor
+  useXRHitTest((results, getWorldMatrix) => {
     if (!isPlaced && reticleRef.current) {
-      reticleRef.current.position.setFromMatrixPosition(hitMatrix)
-      reticleRef.current.visible = true
+      if (results.length > 0) {
+        getWorldMatrix(matrixHelper, results[0])
+        reticleRef.current.position.setFromMatrixPosition(matrixHelper)
+        reticleRef.current.visible = true
+      } else {
+        reticleRef.current.visible = false
+      }
     }
-  })
+  }, 'viewer')
 
   const placeWatch = () => {
     if (!isPlaced && reticleRef.current?.visible) {
+      // Move the hidden watch to where the ring is, then show it
       watchGroupRef.current.position.copy(reticleRef.current.position)
       watchGroupRef.current.visible = true
       reticleRef.current.visible = false
@@ -36,15 +44,16 @@ function ARScanner({ activeColor }) {
 
   return (
     <group>
-      {/* The Targeting Ring */}
+      {/* THE RING: Tap this to place the watch */}
       <mesh ref={reticleRef} rotation={[-Math.PI / 2, 0, 0]} visible={false} onPointerDown={placeWatch}>
         <ringGeometry args={[0.08, 0.1, 32]} />
         <meshBasicMaterial color="#00E5FF" />
       </mesh>
 
-      {/* 3. GODZILLA SCALE: We are blowing it up 5x so it is impossible to miss */}
-      <group ref={watchGroupRef} visible={false} scale={[5, 5, 5]}>
-        {/* The Red Debug Cube */}
+      {/* THE WATCH: Starts hidden. Scale is set to 1 so we can see its true size. */}
+      <group ref={watchGroupRef} visible={false} scale={[1, 1, 1]}>
+
+        {/* THE RED DEBUG CUBE: A 5cm glowing box. If you see this but no watch, the watch materials are broken in AR. */}
         <mesh position={[0, 0.1, 0]}>
           <boxGeometry args={[0.05, 0.05, 0.05]} />
           <meshBasicMaterial color="#FF0000" />
@@ -75,20 +84,26 @@ export default function App() {
 
   const handleEnterAR = () => {
     setIsAR(true);
-    store.enterAR().catch(() => setIsAR(false));
+    // Requesting hit-test explicitly, but completely removing domOverlay
+    store.enterAR({ requiredFeatures: ['hit-test'] }).catch((err) => {
+      console.error(err);
+      setIsAR(false);
+    });
   };
 
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
 
+      {/* 3. THE UI FIX: Moved the button down to 4% so it sits perfectly under the color swatches */}
       {!isAR && (
         <button
           onClick={handleEnterAR}
           style={{
-            position: 'absolute', bottom: '35%', left: '50%', transform: 'translateX(-50%)',
-            zIndex: 20, background: 'white', color: 'black', padding: '12px 24px',
+            position: 'absolute', bottom: '4%', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 20, background: 'white', color: 'black', padding: '10px 24px',
             borderRadius: '30px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase',
-            border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255,255,255,0.3)'
+            border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255,255,255,0.3)',
+            fontSize: '0.8rem'
           }}
         >
           View in Your Space
@@ -101,8 +116,9 @@ export default function App() {
         <XR store={store}>
           <OrbitControls ref={controlsRef} makeDefault minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 1.5} enablePan={false} />
 
-          <ambientLight intensity={2.5} />
-          <directionalLight position={[5, 10, 5]} intensity={4} />
+          {/* Heavy lighting so the watch doesn't go invisible in AR */}
+          <ambientLight intensity={3} />
+          <directionalLight position={[5, 10, 5]} intensity={5} />
           <Environment preset='city' environmentIntensity={1.2} />
 
           <Suspense fallback={<CanvasLoader />}>
