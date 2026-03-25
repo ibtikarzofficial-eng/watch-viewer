@@ -1,135 +1,102 @@
-import { Suspense, useState, useRef, useMemo } from 'react'
-import * as THREE from 'three'
+import { Suspense, useState, useRef } from 'react'
 import './App.css'
 import { Canvas } from '@react-three/fiber'
-import { Environment, OrbitControls } from '@react-three/drei'
+import { Environment, OrbitControls, ContactShadows, PerspectiveCamera } from '@react-three/drei'
+import { EffectComposer, Bloom, ToneMapping } from '@react-three/postprocessing'
 import gsap from 'gsap'
 import CanvasLoader from './CanvasLoader'
 import { Model as WatchModel } from './WatchModel'
 import UI from './UI'
-import { createXRStore, XR, useXRHitTest } from '@react-three/xr'
 
-// 1. PURE XR STORE: No DOM Overlays to crash your Android device
-const store = createXRStore()
-
-function ARScanner({ activeColor }) {
-  const reticleRef = useRef()
-  const watchGroupRef = useRef()
-  const [isPlaced, setIsPlaced] = useState(false)
-
-  const matrixHelper = useMemo(() => new THREE.Matrix4(), [])
-
-  // 2. THE HIT TESTER: Scans the physical floor
-  useXRHitTest((results, getWorldMatrix) => {
-    if (!isPlaced && reticleRef.current) {
-      if (results.length > 0) {
-        getWorldMatrix(matrixHelper, results[0])
-        reticleRef.current.position.setFromMatrixPosition(matrixHelper)
-        reticleRef.current.visible = true
-      } else {
-        reticleRef.current.visible = false
-      }
-    }
-  }, 'viewer')
-
-  const placeWatch = () => {
-    if (!isPlaced && reticleRef.current?.visible) {
-      // Move the hidden watch to where the ring is, then show it
-      watchGroupRef.current.position.copy(reticleRef.current.position)
-      watchGroupRef.current.visible = true
-      reticleRef.current.visible = false
-      setIsPlaced(true)
-    }
-  }
-
-  return (
-    <group>
-      {/* THE RING: Tap this to place the watch */}
-      <mesh ref={reticleRef} rotation={[-Math.PI / 2, 0, 0]} visible={false} onPointerDown={placeWatch}>
-        <ringGeometry args={[0.08, 0.1, 32]} />
-        <meshBasicMaterial color="#00E5FF" />
-      </mesh>
-
-      {/* THE WATCH: Starts hidden. Scale is set to 1 so we can see its true size. */}
-      <group ref={watchGroupRef} visible={false} scale={[1, 1, 1]}>
-
-        {/* THE RED DEBUG CUBE: A 5cm glowing box. If you see this but no watch, the watch materials are broken in AR. */}
-        <mesh position={[0, 0.1, 0]}>
-          <boxGeometry args={[0.05, 0.05, 0.05]} />
-          <meshBasicMaterial color="#FF0000" />
-        </mesh>
-
-        <WatchModel position={[0, 0, 0]} accentColor={activeColor} />
-      </group>
-    </group>
-  )
-}
-
-export default function App() {
+function App() {
   const [activeColor, setActiveColor] = useState('#00E5FF')
-  const [isAR, setIsAR] = useState(false)
+  const [env, setEnv] = useState('city') // Lighting toggle state
   const controlsRef = useRef()
+  const cameraRef = useRef()
 
   const viewCamera = (view) => {
     const views = {
       face: { pos: [0, 0, 5], target: [0, 0, 0] },
       side: { pos: [4, 0.5, 2], target: [0, -0.1, 0] },
-      buckle: { pos: [0, -3.5, -3], target: [0, -0.5, -0.5] }
+      buckle: { pos: [0, -3.5, -3], target: [0, -0.5, -0.5] },
+      macro: { pos: [0.8, 0.5, 1.2], target: [0, 0.1, 0.2] } // NEW: Macro Zoom
     }
+
     const { pos, target } = views[view]
 
-    gsap.to(controlsRef.current.object.position, { x: pos[0], y: pos[1], z: pos[2], duration: 1.5, ease: "power3.inOut" })
-    gsap.to(controlsRef.current.target, { x: target[0], y: target[1], z: target[2], duration: 1.5, ease: "power3.inOut" })
+    gsap.to(cameraRef.current.position, {
+      x: pos[0], y: pos[1], z: pos[2],
+      duration: 2,
+      ease: "expo.inOut"
+    })
+
+    gsap.to(controlsRef.current.target, {
+      x: target[0], y: target[1], z: target[2],
+      duration: 2,
+      ease: "expo.inOut"
+    })
   }
 
-  const handleEnterAR = () => {
-    setIsAR(true);
-    // Requesting hit-test explicitly, but completely removing domOverlay
-    store.enterAR({ requiredFeatures: ['hit-test'] }).catch((err) => {
-      console.error(err);
-      setIsAR(false);
-    });
-  };
-
   return (
-    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+    <div style={{ position: 'relative', height: '100vh', width: '100vw', background: env === 'city' ? '#050505' : '#1a1a1a' }}>
 
-      {/* 3. THE UI FIX: Moved the button down to 4% so it sits perfectly under the color swatches */}
-      {!isAR && (
-        <button
-          onClick={handleEnterAR}
-          style={{
-            position: 'absolute', bottom: '4%', left: '50%', transform: 'translateX(-50%)',
-            zIndex: 20, background: 'white', color: 'black', padding: '10px 24px',
-            borderRadius: '30px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase',
-            border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255,255,255,0.3)',
-            fontSize: '0.8rem'
-          }}
-        >
-          View in Your Space
-        </button>
-      )}
+      {/* 1. LIGHTING TOGGLE */}
+      <div style={{ position: 'absolute', top: '100px', left: '40px', zIndex: 10, display: 'flex', gap: '10px' }}>
+        <button onClick={() => setEnv('city')} style={btnStyle(env === 'city')}>STUDIO</button>
+        <button onClick={() => setEnv('sunset')} style={btnStyle(env === 'sunset')}>GOLDEN HOUR</button>
+        <button onClick={() => viewCamera('macro')} style={macroBtnStyle}>MACRO ZOOM</button>
+      </div>
 
-      {!isAR && <UI setActiveColor={setActiveColor} activeColor={activeColor} viewCamera={viewCamera} />}
+      <UI setActiveColor={setActiveColor} activeColor={activeColor} viewCamera={viewCamera} />
 
-      <Canvas camera={{ position: [0, 0, 5], fov: 50 }} gl={{ alpha: true, antialias: true }}>
-        <XR store={store}>
-          <OrbitControls ref={controlsRef} makeDefault minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 1.5} enablePan={false} />
+      <Canvas shadows gl={{ antialias: true, stencil: false, depth: true }}>
+        <PerspectiveCamera makeDefault ref={cameraRef} position={[0, 0, 5]} fov={50} />
 
-          {/* Heavy lighting so the watch doesn't go invisible in AR */}
-          <ambientLight intensity={3} />
-          <directionalLight position={[5, 10, 5]} intensity={5} />
-          <Environment preset='city' environmentIntensity={1.2} />
+        <OrbitControls
+          ref={controlsRef}
+          makeDefault
+          enablePan={false}
+          minDistance={1}
+          maxDistance={8}
+        />
 
-          <Suspense fallback={<CanvasLoader />}>
-            {isAR ? (
-              <ARScanner activeColor={activeColor} />
-            ) : (
-              <WatchModel position={[0, 0.35, 0]} accentColor={activeColor} />
-            )}
-          </Suspense>
-        </XR>
+        {/* 2. DYNAMIC ENVIRONMENT */}
+        <Environment preset={env} environmentIntensity={env === 'city' ? 1 : 1.5} />
+
+        <ambientLight intensity={0.5} />
+        <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} castShadow />
+
+        <Suspense fallback={<CanvasLoader />}>
+          <WatchModel position={[0, 0.2, 0]} accentColor={activeColor} />
+
+          {/* 3. CONTACT SHADOWS: Makes the watch feel "grounded" */}
+          <ContactShadows position={[0, -1.5, 0]} opacity={0.4} scale={10} blur={2} far={4.5} />
+        </Suspense>
+
+        {/* 4. POST-PROCESSING: THE MOVIE LOOK */}
+        <EffectComposer disableNormalPass>
+          <Bloom
+            luminanceThreshold={1.2}
+            mipmapBlur
+            intensity={0.4}
+            radius={0.3}
+          />
+          <ToneMapping />
+        </EffectComposer>
       </Canvas>
     </div>
   )
 }
+
+// Quick Styles
+const btnStyle = (active) => ({
+  background: active ? '#00E5FF' : 'rgba(255,255,255,0.1)',
+  color: active ? 'black' : 'white',
+  border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px'
+});
+
+const macroBtnStyle = {
+  background: '#fff', color: '#000', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px'
+};
+
+export default App

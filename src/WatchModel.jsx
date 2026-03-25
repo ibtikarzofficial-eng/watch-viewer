@@ -9,20 +9,26 @@ export function Model({ accentColor = "#00E5FF", ...props }) {
   // 1. Global Upgrade: Make the whole watch look like luxury metal, not just the accents
   useEffect(() => {
     Object.values(materials).forEach((mat) => {
-      mat.envMapIntensity = 2.0; // Forces every part of the watch to reflect the lighting
-      mat.roughness = 0.2;       // Smooths out the default plastic look
+      // General Metal Fix
+      mat.metalness = 0.95;
+      mat.roughness = 0.18; // Enough roughness so textures (numbers) don't disappear
+      mat.envMapIntensity = 1.5;
+
+      // Fix for the Bezel specifically if it has a texture
+      if (mat.name.toLowerCase().includes('bezel') || mat.name.includes('Material.001')) {
+        mat.roughness = 0.25; // More matte for the printed numbers
+      }
       mat.needsUpdate = true;
     });
   }, [materials]);
 
-  // 2. The Premium Accent Metal (Fixed so it doesn't turn black)
   const accentMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
     color: '#00E5FF',
-    metalness: 0.6,         // Lowered from 0.8 so it retains its color
-    roughness: 0.15,
-    clearcoat: 1.0,         // The high-gloss polish layer
-    clearcoatRoughness: 0.1,
-    envMapIntensity: 2.5    // High reflection
+    metalness: 0.8,
+    roughness: 0.1,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.05,
+    envMapIntensity: 2
   }), []);
 
   // 3. Target color to lerp towards
