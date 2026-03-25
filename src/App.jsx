@@ -1,4 +1,5 @@
-import { Suspense, useState, useRef, useEffect } from 'react'
+import { Suspense, useState, useRef, useMemo } from 'react'
+import * as THREE from 'three' // THE NEW REQUIREMENT FOR HIT TESTING
 import './App.css'
 import { Canvas } from '@react-three/fiber'
 import { Environment, OrbitControls } from '@react-three/drei'
@@ -6,12 +7,11 @@ import gsap from 'gsap'
 import CanvasLoader from './CanvasLoader'
 import { Model as WatchModel } from './WatchModel'
 import UI from './UI'
-import { createXRStore, XR, useHitTest } from '@react-three/xr'
 
-// 1. Initialize XR with hit-testing required
-const store = createXRStore({
-  sessionInit: { requiredFeatures: ['hit-test'] }
-})
+// THE FIXED IMPORT
+import { createXRStore, XR, useXRHitTest } from '@react-three/xr'
+
+const store = createXRStore() // hit-testing is now enabled by default in v6
 
 // 2. THE AR ENGINE (Now with HUD communication)
 function ARScanner({ activeColor, setToast }) {
@@ -19,24 +19,33 @@ function ARScanner({ activeColor, setToast }) {
   const [placedPos, setPlacedPos] = useState(null)
   const hasFoundSurface = useRef(false)
 
-  // Scan the physical room every frame
-  useHitTest((hitMatrix) => {
-    if (!placedPos && reticleRef.current) {
-      hitMatrix.decompose(
-        reticleRef.current.position,
-        reticleRef.current.quaternion,
-        reticleRef.current.scale
-      )
+  // We need a blank 3D matrix to hold the floor's coordinates
+  const matrixHelper = useMemo(() => new THREE.Matrix4(), [])
 
-      // If we just found the floor for the first time, update the HUD!
-      if (!hasFoundSurface.current) {
-        hasFoundSurface.current = true;
-        setToast("TARGET LOCKED: Tap screen to place watch");
+  // THE NEW V6 HIT TEST API
+  useXRHitTest(
+    (results, getWorldMatrix) => {
+      // If we haven't placed the watch yet, keep scanning
+      if (!placedPos && reticleRef.current) {
+        // If the scanner finds a physical floor (results > 0)
+        if (results.length > 0) {
+          // Extract the exact 3D coordinates from the physical world
+          getWorldMatrix(matrixHelper, results[0])
+
+          // Move our glowing cyan ring to those coordinates
+          reticleRef.current.position.setFromMatrixPosition(matrixHelper)
+
+          // Trigger the HUD update only once
+          if (!hasFoundSurface.current) {
+            hasFoundSurface.current = true;
+            setToast("TARGET LOCKED: Tap screen to place watch");
+          }
+        }
       }
-    }
-  })
+    },
+    'viewer' // Casts the scanning ray directly from the center of your phone screen
+  )
 
-  // Teleport the watch to the ring
   const placeWatch = () => {
     if (!placedPos && reticleRef.current && hasFoundSurface.current) {
       setPlacedPos([
@@ -50,7 +59,6 @@ function ARScanner({ activeColor, setToast }) {
 
   return (
     <group onPointerDown={placeWatch}>
-      {/* The Targeting Ring: Made it a solid, bright disc so it is IMPOSSIBLE to miss */}
       {!placedPos && (
         <mesh ref={reticleRef} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[0.1, 32]} />
@@ -58,7 +66,6 @@ function ARScanner({ activeColor, setToast }) {
         </mesh>
       )}
 
-      {/* The Watch: Spawns exactly where tapped */}
       {placedPos && (
         <group position={placedPos} scale={[0.15, 0.15, 0.15]}>
           <WatchModel position={[0, 0, 0]} accentColor={activeColor} />
