@@ -1,12 +1,15 @@
-import { Suspense, useState, useRef } from 'react'
+import { Suspense, useState, useRef, useEffect } from 'react'
 import './App.css'
 import { Canvas } from '@react-three/fiber'
 import { Environment, OrbitControls, ContactShadows, PerspectiveCamera } from '@react-three/drei'
-import { EffectComposer, Bloom, ToneMapping } from '@react-three/postprocessing'
+import { EffectComposer, ToneMapping, Bloom } from '@react-three/postprocessing'
 import gsap from 'gsap'
 import CanvasLoader from './CanvasLoader'
 import { Model as WatchModel } from './WatchModel'
 import UI from './UI'
+import { XR } from '@react-three/xr'
+import { ARInterface, ARScaler } from './AR'
+import { store } from './ARStore'
 
 function App() {
   const [activeColor, setActiveColor] = useState('#00E5FF')
@@ -14,12 +17,23 @@ function App() {
   const controlsRef = useRef()
   const cameraRef = useRef()
 
+  useEffect(() => {
+    gsap.fromTo('.top-bar', 
+      { y: -30, opacity: 0 }, 
+      { y: 0, opacity: 1, duration: 1.2, ease: "power3.out", delay: 0.2 }
+    );
+    gsap.fromTo('.ar-container',
+      { y: 30, opacity: 0 }, 
+      { y: 0, opacity: 1, duration: 1, ease: "power3.out", delay: 0.8 }
+    );
+  }, []);
+
   const viewCamera = (view) => {
     const views = {
-      face: { pos: [0, 0, 5], target: [0, 0, 0] },
-      side: { pos: [4, 0.5, 2], target: [0, -0.1, 0] },
-      buckle: { pos: [0, -3.5, -3], target: [0, -0.5, -0.5] },
-      macro: { pos: [0.8, 0.5, 1.2], target: [0, 0.1, 0.2] } // NEW: Macro Zoom
+      face: { pos: [0, -0.6, 0.4], target: [0, -1.0, -0.6] },
+      side: { pos: [0.8, -0.9, -0.2], target: [0, -1.0, -0.6] },
+      buckle: { pos: [0, -1.7, -1.2], target: [0, -1.0, -0.6] },
+      macro: { pos: [0.16, -0.9, -0.36], target: [0, -0.98, -0.56] }
     }
 
     const { pos, target } = views[view]
@@ -38,65 +52,83 @@ function App() {
   }
 
   return (
-    <div style={{ position: 'relative', height: '100vh', width: '100vw', background: env === 'city' ? '#050505' : '#1a1a1a' }}>
+    <div className={`app-container ${env === 'sunset' ? 'sunset' : ''}`}>
 
-      {/* 1. LIGHTING TOGGLE */}
-      <div style={{ position: 'absolute', top: '100px', left: '40px', zIndex: 10, display: 'flex', gap: '10px' }}>
-        <button onClick={() => setEnv('city')} style={btnStyle(env === 'city')}>STUDIO</button>
-        <button onClick={() => setEnv('sunset')} style={btnStyle(env === 'sunset')}>GOLDEN HOUR</button>
-        <button onClick={() => viewCamera('macro')} style={macroBtnStyle}>MACRO ZOOM</button>
+      {/* RESPONSIVE UI OVERLAY */}
+      <div className="ui-container">
+        {/* TOP BAR */}
+        <div className="top-bar">
+          <div className="title-container">
+            <h1>Edifice <span>Configurator v0.0.2</span></h1>
+          </div>
+          
+          <div className="lighting-toggles">
+            <button 
+              onClick={() => setEnv('city')} 
+              className="lighting-btn"
+              style={{ background: env === 'city' ? '#00E5FF' : 'rgba(255,255,255,0.1)', color: env === 'city' ? 'black' : 'white' }}>
+              STUDIO
+            </button>
+            <button 
+              onClick={() => setEnv('sunset')} 
+              className="lighting-btn"
+              style={{ background: env === 'sunset' ? '#00E5FF' : 'rgba(255,255,255,0.1)', color: env === 'sunset' ? 'black' : 'white' }}>
+              GOLDEN HOUR
+            </button>
+            <button 
+              onClick={() => viewCamera('macro')} 
+              className="lighting-btn"
+              style={{ background: '#fff', color: '#000' }}>
+              MACRO ZOOM
+            </button>
+          </div>
+        </div>
+
+        {/* BOTTOM AREA */}
+        <div className="bottom-area">
+          <UI setActiveColor={setActiveColor} activeColor={activeColor} viewCamera={viewCamera} />
+          <ARInterface />
+        </div>
       </div>
 
-      <UI setActiveColor={setActiveColor} activeColor={activeColor} viewCamera={viewCamera} />
-
-      <Canvas shadows gl={{ antialias: true, stencil: false, depth: true }}>
-        <PerspectiveCamera makeDefault ref={cameraRef} position={[0, 0, 5]} fov={50} />
+      <Canvas shadows gl={{ antialias: true, stencil: false, depth: true }} style={{ width: '100%', height: '100%' }}>
+        <XR store={store}>
+          <PerspectiveCamera makeDefault ref={cameraRef} position={[0, -0.6, 0.4]} fov={40} />
 
         <OrbitControls
           ref={controlsRef}
           makeDefault
           enablePan={false}
-          minDistance={1}
-          maxDistance={8}
+          minDistance={0.1}
+          maxDistance={3}
+          target={[0, -1.0, -0.6]}
+          autoRotate={true}
+          autoRotateSpeed={0.5}
         />
 
-        {/* 2. DYNAMIC ENVIRONMENT */}
-        <Environment preset={env} environmentIntensity={env === 'city' ? 1 : 1.5} />
+        <Environment preset={env} environmentIntensity={1} />
 
         <ambientLight intensity={0.5} />
         <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} castShadow />
 
         <Suspense fallback={<CanvasLoader />}>
-          <WatchModel position={[0, 0.2, 0]} accentColor={activeColor} />
+          <ARScaler>
+            <WatchModel accentColor={activeColor} />
+          </ARScaler>
 
-          {/* 3. CONTACT SHADOWS: Makes the watch feel "grounded" */}
-          <ContactShadows position={[0, -1.5, 0]} opacity={0.4} scale={10} blur={2} far={4.5} />
+          {/* Contact Shadows for grounding */}
+          <ContactShadows position={[0, -1.1, -0.6]} opacity={0.6} scale={2} blur={2} far={2.0} />
         </Suspense>
 
-        {/* 4. POST-PROCESSING: THE MOVIE LOOK */}
+        {/* Post Processing */}
         <EffectComposer disableNormalPass>
-          <Bloom
-            luminanceThreshold={1.2}
-            mipmapBlur
-            intensity={0.4}
-            radius={0.3}
-          />
           <ToneMapping />
+          <Bloom luminanceThreshold={0.9} luminanceSmoothing={0.9} intensity={0.2} mipmapBlur />
         </EffectComposer>
+        </XR>
       </Canvas>
     </div>
   )
 }
-
-// Quick Styles
-const btnStyle = (active) => ({
-  background: active ? '#00E5FF' : 'rgba(255,255,255,0.1)',
-  color: active ? 'black' : 'white',
-  border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px'
-});
-
-const macroBtnStyle = {
-  background: '#fff', color: '#000', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px'
-};
 
 export default App
