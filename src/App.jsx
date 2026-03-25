@@ -1,5 +1,5 @@
 import { Suspense, useState, useRef, useMemo } from 'react'
-import * as THREE from 'three' // THE NEW REQUIREMENT FOR HIT TESTING
+import * as THREE from 'three'
 import './App.css'
 import { Canvas } from '@react-three/fiber'
 import { Environment, OrbitControls } from '@react-three/drei'
@@ -7,90 +7,74 @@ import gsap from 'gsap'
 import CanvasLoader from './CanvasLoader'
 import { Model as WatchModel } from './WatchModel'
 import UI from './UI'
-
-// THE FIXED IMPORT
 import { createXRStore, XR, useXRHitTest } from '@react-three/xr'
 
-const store = createXRStore() // hit-testing is now enabled by default in v6
+// 1. THE DOM OVERLAY FIX: This forces the browser to show your HTML toasts over the AR camera
+const store = createXRStore({
+  sessionInit: {
+    requiredFeatures: ['hit-test'],
+    optionalFeatures: ['dom-overlay'],
+    domOverlay: { root: document.body }
+  }
+})
 
-// 2. THE AR ENGINE (Now with HUD communication)
 function ARScanner({ activeColor, setToast }) {
   const reticleRef = useRef()
-  const [placedPos, setPlacedPos] = useState(null)
-  const hasFoundSurface = useRef(false)
+  const watchGroupRef = useRef() // We use a ref to move the watch, NOT React State
+  const [isPlaced, setIsPlaced] = useState(false)
 
-  // We need a blank 3D matrix to hold the floor's coordinates
   const matrixHelper = useMemo(() => new THREE.Matrix4(), [])
 
-  // THE NEW V6 HIT TEST API
-  useXRHitTest(
-    (results, getWorldMatrix) => {
-      // If we haven't placed the watch yet, keep scanning
-      if (!placedPos && reticleRef.current) {
-        // If the scanner finds a physical floor (results > 0)
-        if (results.length > 0) {
-          // Extract the exact 3D coordinates from the physical world
-          getWorldMatrix(matrixHelper, results[0])
-
-          // Move our glowing cyan ring to those coordinates
-          reticleRef.current.position.setFromMatrixPosition(matrixHelper)
-
-          // Trigger the HUD update only once
-          if (!hasFoundSurface.current) {
-            hasFoundSurface.current = true;
-            setToast("TARGET LOCKED: Tap screen to place watch");
-          }
-        }
+  useXRHitTest((results, getWorldMatrix) => {
+    if (!isPlaced && reticleRef.current) {
+      if (results.length > 0) {
+        getWorldMatrix(matrixHelper, results[0])
+        reticleRef.current.position.setFromMatrixPosition(matrixHelper)
+        reticleRef.current.visible = true
+        setToast("TARGET LOCKED: Tap the blue circle to place watch")
+      } else {
+        reticleRef.current.visible = false
+        setToast("SCANNING... Point camera at the floor and move it slowly")
       }
-    },
-    'viewer' // Casts the scanning ray directly from the center of your phone screen
-  )
+    }
+  }, 'viewer')
 
   const placeWatch = () => {
-    if (!placedPos && reticleRef.current && hasFoundSurface.current) {
-      setPlacedPos([
-        reticleRef.current.position.x,
-        reticleRef.current.position.y,
-        reticleRef.current.position.z
-      ])
-      setToast("WATCH PLACED! Walk around to inspect.");
+    // 2. THE GPU FIX: We don't re-render. We just move the hidden watch and make it visible.
+    if (!isPlaced && reticleRef.current?.visible) {
+      watchGroupRef.current.position.copy(reticleRef.current.position)
+      watchGroupRef.current.visible = true
+      reticleRef.current.visible = false
+      setIsPlaced(true)
+      setToast("WATCH PLACED! You can now walk around it.")
     }
   }
 
   return (
-    <group onPointerDown={placeWatch}>
-      {/* 2. The Watch (Only shows AFTER tapping the screen) */}
-      {placedPos && (
-        <group position={placedPos}>
+    <group>
+      {/* Attach the tap event directly to the glowing ring */}
+      <mesh ref={reticleRef} rotation={[-Math.PI / 2, 0, 0]} visible={false} onPointerDown={placeWatch}>
+        <ringGeometry args={[0.08, 0.1, 32]} />
+        <meshBasicMaterial color="#00E5FF" />
+      </mesh>
 
-          {/* THE DEBUG CUBE: A 10cm red box floating exactly where you tapped. */}
-          <mesh position={[0, 0.1, 0]}>
-            <boxGeometry args={[0.1, 0.1, 0.1]} />
-            <meshBasicMaterial color="#FF0000" />
-          </mesh>
-
-          {/* THE WATCH: Back to 100% scale! Let's see how big it really is. */}
-          <group scale={[1, 1, 1]}>
-            <WatchModel position={[0, 0, 0]} accentColor={activeColor} />
-          </group>
-
-        </group>
-      )}
-
-      {placedPos && (
-        <group position={placedPos} scale={[0.15, 0.15, 0.15]}>
-          <WatchModel position={[0, 0, 0]} accentColor={activeColor} />
-        </group>
-      )}
+      {/* The watch is loaded into memory instantly, but stays invisible until you tap */}
+      <group ref={watchGroupRef} visible={false}>
+        {/* The 10cm Red Debug Cube */}
+        <mesh position={[0, 0.1, 0]}>
+          <boxGeometry args={[0.1, 0.1, 0.1]} />
+          <meshBasicMaterial color="#FF0000" />
+        </mesh>
+        <WatchModel position={[0, 0, 0]} accentColor={activeColor} />
+      </group>
     </group>
   )
 }
 
-// 3. THE MAIN APP
 function App() {
   const [activeColor, setActiveColor] = useState('#00E5FF')
   const [isAR, setIsAR] = useState(false)
-  const [toast, setToast] = useState("") // THE NEW HUD STATE
+  const [toast, setToast] = useState("")
   const controlsRef = useRef()
 
   const viewCamera = (view) => {
@@ -101,73 +85,64 @@ function App() {
     }
     const { pos, target } = views[view]
 
-    gsap.to(controlsRef.current.object.position, {
-      x: pos[0], y: pos[1], z: pos[2], duration: 1.5, ease: "power3.inOut"
-    })
-    gsap.to(controlsRef.current.target, {
-      x: target[0], y: target[1], z: target[2], duration: 1.5, ease: "power3.inOut"
-    })
+    gsap.to(controlsRef.current.object.position, { x: pos[0], y: pos[1], z: pos[2], duration: 1.5, ease: "power3.inOut" })
+    gsap.to(controlsRef.current.target, { x: target[0], y: target[1], z: target[2], duration: 1.5, ease: "power3.inOut" })
   }
 
   const handleEnterAR = () => {
     setIsAR(true);
-    setToast("SCANNING ROOM... Point camera at a flat, bright floor.");
+    setToast("STARTING AR...");
 
     store.enterAR().catch(() => {
       setIsAR(false);
-      setToast(""); // Clear toast if AR fails or is canceled
+      setToast("");
     });
   };
 
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
 
-      {/* THE HUD / TOAST NOTIFICATION */}
-      {toast && (
+      {/* THIS TOAST WILL NOW FLOAT OVER THE CAMERA */}
+      {isAR && toast && (
         <div style={{
           position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(0, 229, 255, 0.2)', border: '1px solid #00E5FF',
-          color: '#fff', padding: '15px 30px', borderRadius: '8px', zIndex: 100,
-          fontWeight: '600', letterSpacing: '1px', textAlign: 'center',
-          backdropFilter: 'blur(10px)', width: '80%', maxWidth: '400px'
+          background: 'rgba(0, 0, 0, 0.8)', border: '2px solid #00E5FF',
+          color: '#00E5FF', padding: '15px 30px', borderRadius: '8px', zIndex: 9999,
+          fontWeight: '800', letterSpacing: '1px', textAlign: 'center', width: '80%'
         }}>
           {toast}
         </div>
       )}
 
-      {/* Hide the AR button when already inside AR */}
       {!isAR && (
         <button
           onClick={handleEnterAR}
           style={{
             position: 'absolute', bottom: '35%', left: '50%', transform: 'translateX(-50%)',
             zIndex: 20, background: 'white', color: 'black', padding: '12px 24px',
-            borderRadius: '30px', fontWeight: '800', letterSpacing: '2px',
-            textTransform: 'uppercase', border: 'none', cursor: 'pointer',
-            boxShadow: '0 4px 15px rgba(255,255,255,0.3)'
+            borderRadius: '30px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase',
+            border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255,255,255,0.3)'
           }}
         >
           View in Your Space
         </button>
       )}
 
-      {/* Hide UI swatches while in AR so user can focus on placing the watch */}
       {!isAR && <UI setActiveColor={setActiveColor} activeColor={activeColor} viewCamera={viewCamera} />}
 
       <Canvas camera={{ position: [0, 0, 5], fov: 50 }} gl={{ alpha: true, antialias: true }}>
         <XR store={store}>
           <OrbitControls ref={controlsRef} makeDefault minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 1.5} enablePan={false} />
 
+          {/* AR Lighting */}
           <ambientLight intensity={2.5} />
           <directionalLight position={[5, 10, 5]} intensity={4} />
-          <directionalLight position={[-5, -5, -5]} intensity={2} />
           <Environment preset='city' environmentIntensity={1.2} />
 
           <Suspense fallback={<CanvasLoader />}>
             {isAR ? (
               <ARScanner activeColor={activeColor} setToast={setToast} />
             ) : (
-              // NON-AR MODE: perfectly centered, normal size, no red cube
               <WatchModel position={[0, 0.35, 0]} accentColor={activeColor} />
             )}
           </Suspense>
