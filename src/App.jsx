@@ -2,18 +2,21 @@ import { Suspense, useState, useRef } from 'react'
 import './App.css'
 import { Canvas } from '@react-three/fiber'
 import { Environment, OrbitControls } from '@react-three/drei'
-import { ARButton, XR } from '@react-three/xr' // THE NEW AR IMPORTS
+// 1. NEW IMPORT: Grab createXRStore and XR
+import { createXRStore, XR } from '@react-three/xr'
 import gsap from 'gsap'
 import CanvasLoader from './CanvasLoader'
 import { Model as WatchModel } from './WatchModel'
 import UI from './UI'
+
+// 2. THE NEW API: Initialize the XR store outside of your component
+const store = createXRStore()
 
 function App() {
   const [activeColor, setActiveColor] = useState('#00E5FF')
   const controlsRef = useRef()
 
   const viewCamera = (view) => {
-    // ... keep your existing GSAP viewCamera logic exactly the same
     const views = {
       face: { pos: [0, 0, 5], target: [0, 0, 0] },
       side: { pos: [4, 0.5, 2], target: [0, -0.1, 0] },
@@ -36,8 +39,9 @@ function App() {
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
 
-      {/* THE AR BUTTON: This automatically detects if the device supports AR */}
-      <ARButton
+      {/* 3. THE TRIGGER: Standard HTML button that calls store.enterAR() */}
+      <button
+        onClick={() => store.enterAR()}
         style={{
           position: 'absolute',
           bottom: '35%',
@@ -57,13 +61,13 @@ function App() {
         }}
       >
         View in Your Space
-      </ARButton>
+      </button>
 
       <UI setActiveColor={setActiveColor} activeColor={activeColor} viewCamera={viewCamera} />
 
       <Canvas camera={{ position: [0, 0, 5], fov: 50 }} gl={{ alpha: true, antialias: true }}>
-        {/* Wrap your 3D world in the XR provider */}
-        <XR>
+        {/* 4. THE WRAPPER: Pass the store to the XR component */}
+        <XR store={store}>
           <OrbitControls
             ref={controlsRef}
             makeDefault
@@ -74,11 +78,6 @@ function App() {
           <Environment preset='city' environmentIntensity={1.2} />
 
           <Suspense fallback={<CanvasLoader />}>
-            {/* THE GODZILLA FIX: 
-                If the watch looks massive in AR, you will need to wrap it in a group 
-                and scale it down drastically like: scale={[0.05, 0.05, 0.05]} 
-                For now, test its native scale first.
-            */}
             <WatchModel position={[0, 0.35, 0]} accentColor={activeColor} />
           </Suspense>
         </XR>
