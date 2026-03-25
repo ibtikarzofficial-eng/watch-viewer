@@ -40,6 +40,10 @@ function App() {
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
 
       {/* 3. THE TRIGGER: Standard HTML button that calls store.enterAR() */}
+
+
+      <UI setActiveColor={setActiveColor} activeColor={activeColor} viewCamera={viewCamera} />
+
       <button
         onClick={() => store.enterAR()}
         style={{
@@ -63,8 +67,6 @@ function App() {
         View in Your Space
       </button>
 
-      <UI setActiveColor={setActiveColor} activeColor={activeColor} viewCamera={viewCamera} />
-
       <Canvas camera={{ position: [0, 0, 5], fov: 50 }} gl={{ alpha: true, antialias: true }}>
         {/* 4. THE WRAPPER: Pass the store to the XR component */}
         <XR store={store}>
@@ -78,7 +80,10 @@ function App() {
           <Environment preset='city' environmentIntensity={1.2} />
 
           <Suspense fallback={<CanvasLoader />}>
-            <WatchModel position={[0, 0.35, 0]} accentColor={activeColor} />
+            {/* THE AR FIX: Push it 0.5 meters away from the camera and scale it down */}
+            <group position={[0, 0, -0.5]} scale={[0.15, 0.15, 0.15]}>
+              <WatchModel position={[0, 0, 0]} accentColor={activeColor} />
+            </group>
           </Suspense>
         </XR>
       </Canvas>
