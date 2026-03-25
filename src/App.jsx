@@ -59,11 +59,22 @@ function ARScanner({ activeColor, setToast }) {
 
   return (
     <group onPointerDown={placeWatch}>
-      {!placedPos && (
-        <mesh ref={reticleRef} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.1, 32]} />
-          <meshBasicMaterial color="#00E5FF" transparent opacity={0.6} />
-        </mesh>
+      {/* 2. The Watch (Only shows AFTER tapping the screen) */}
+      {placedPos && (
+        <group position={placedPos}>
+
+          {/* THE DEBUG CUBE: A 10cm red box floating exactly where you tapped. */}
+          <mesh position={[0, 0.1, 0]}>
+            <boxGeometry args={[0.1, 0.1, 0.1]} />
+            <meshBasicMaterial color="#FF0000" />
+          </mesh>
+
+          {/* THE WATCH: Back to 100% scale! Let's see how big it really is. */}
+          <group scale={[1, 1, 1]}>
+            <WatchModel position={[0, 0, 0]} accentColor={activeColor} />
+          </group>
+
+        </group>
       )}
 
       {placedPos && (
