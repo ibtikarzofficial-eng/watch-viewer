@@ -21,7 +21,7 @@ export default function UI({ setActiveColor, activeColor }) {
             {/* Bottom Floating Control Bar */}
             <div style={{
                 position: 'absolute',
-                bottom: '40px',
+                bottom: '15%',
                 left: '50%',
                 transform: 'translateX(-50%)',
                 zIndex: 10,
