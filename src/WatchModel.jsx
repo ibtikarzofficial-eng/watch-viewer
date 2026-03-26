@@ -8,33 +8,52 @@ Source: https://sketchfab.com/3d-models/casio-edifice-watch-996400a75cf14ba59b33
 Title: Casio Edifice watch
 */
 
-import React, { useMemo, useEffect } from 'react'
+import React, { useMemo, useEffect, useRef } from 'react'
 import { useGLTF } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 export function Model({ accentColor = "#00e5ff", ...props }) {
+  const hourRef = useRef();
+  const minuteRef = useRef();
+  const secondRef = useRef();
+
+  useFrame(() => {
+    const d = new Date();
+    const h = d.getHours() % 12;
+    const m = d.getMinutes();
+    const s = d.getSeconds();
+    const ms = d.getMilliseconds();
+    
+    const smoothS = s + ms / 1000;
+    const smoothM = m + smoothS / 60;
+    const smoothH = h + smoothM / 60;
+
+    if (hourRef.current) hourRef.current.rotation.y = -smoothH * (Math.PI * 2) / 12;
+    if (minuteRef.current) minuteRef.current.rotation.y = -smoothM * (Math.PI * 2) / 60;
+    // The second hand has an inverted local Y axis due to its X/Z rotation (-PI/PI), so it needs positive rotation to tick clockwise.
+    if (secondRef.current) secondRef.current.rotation.y = smoothS * (Math.PI * 2) / 60;
+  });
   const { nodes, materials } = useGLTF('/watch.glb')
 
   const dynamicMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
     color: accentColor,
-    metalness: 0.8,
-    roughness: 0.2,
-    clearcoat: 0.2,
-    clearcoatRoughness: 0.2,
-    envMapIntensity: 1.0
+    metalness: 0.9,
+    roughness: 0.25,
+    envMapIntensity: 1.2,
+    clearcoat: 0.1
   }), []);
 
   const glassMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
     color: '#ffffff',
-    transmission: 0.9,
+    transmission: 1.0,
     opacity: 1,
     transparent: true,
-    roughness: 0.1,
-    ior: 1.45,
-    thickness: 0.2,
+    roughness: 0,
+    ior: 1.5,
+    thickness: 0.1,
     depthWrite: false,
-    clearcoat: 0.5,
-    envMapIntensity: 1.0
+    envMapIntensity: 1.5
   }), []);
 
   useEffect(() => {
@@ -63,21 +82,21 @@ export function Model({ accentColor = "#00e5ff", ...props }) {
         <group rotation={[Math.PI / 2, 0, 0]}>
           <group position={[0.003, 0, 0.229]} rotation={[0, 0.001, 0]}>
             <mesh geometry={nodes.Object_4.geometry} material={materials['Material.001']} />
-            <mesh geometry={nodes.Object_5.geometry} material={materials['Material.002']} />
+            <mesh geometry={nodes.Object_5.geometry} material={dynamicMaterial} />
           </group>
           <group position={[0, -0.007, 0]} scale={[0.014, 0.012, 0.038]}>
             <mesh geometry={nodes.Object_7.geometry} material={materials['Material.009']} />
             <mesh geometry={nodes.Object_8.geometry} material={dynamicMaterial} />
           </group>
-          <group position={[-0.002, 0.014, -0.002]} rotation={[0, 0.941, 0]} scale={[0.024, 0.016, 0.024]}>
+          <group ref={hourRef} position={[-0.002, 0.014, -0.002]} rotation={[0, 0, 0]} scale={[0.024, 0.016, 0.024]}>
             <mesh geometry={nodes.Object_10.geometry} material={materials['Material.001']} />
             <mesh geometry={nodes.Object_11.geometry} material={dynamicMaterial} />
           </group>
-          <group position={[-0.002, 0.014, -0.002]} rotation={[-3.14, -0.475, Math.PI]}>
+          <group ref={secondRef} position={[-0.002, 0.014, -0.002]} rotation={[-3.14, 0, Math.PI]}>
             <mesh geometry={nodes.Object_13.geometry} material={dynamicMaterial} />
             <mesh geometry={nodes.Object_14.geometry} material={materials['Material.002']} />
           </group>
-          <group position={[-0.002, 0.014, -0.002]} rotation={[0, 0.889, 0]} scale={[0.024, 0.016, 0.024]}>
+          <group ref={minuteRef} position={[-0.002, 0.014, -0.002]} rotation={[0, 0, 0]} scale={[0.024, 0.016, 0.024]}>
             <mesh geometry={nodes.Object_16.geometry} material={materials['Material.001']} />
             <mesh geometry={nodes.Object_17.geometry} material={dynamicMaterial} />
           </group>
@@ -87,11 +106,11 @@ export function Model({ accentColor = "#00e5ff", ...props }) {
           </group>
           <group position={[-0.213, -0.004, 0.008]} scale={[0.024, 0.016, 0.024]}>
             <mesh geometry={nodes.Object_36.geometry} material={materials['Material.001']} />
-            <mesh geometry={nodes.Object_37.geometry} material={materials['Material.002']} />
+            <mesh geometry={nodes.Object_37.geometry} material={dynamicMaterial} />
           </group>
           <group position={[0.227, -0.002, 0.005]} rotation={[0, 1.017, 0]} scale={[0.024, 0.016, 0.024]}>
             <mesh geometry={nodes.Object_39.geometry} material={materials['Material.001']} />
-            <mesh geometry={nodes.Object_40.geometry} material={materials['Material.002']} />
+            <mesh geometry={nodes.Object_40.geometry} material={dynamicMaterial} />
           </group>
           <group position={[0, -0.008, 0]} scale={0.438}>
             <mesh geometry={nodes.Object_66.geometry} material={materials['Material.006']} />

@@ -7,7 +7,7 @@ export default function UI({ setActiveColor, activeColor, viewCamera }) {
         { name: 'Racing Red', hex: '#FF2A2A' },
         { name: 'Electric Cyan', hex: '#00E5FF' },
         { name: 'Neon Volt', hex: '#D4FF00' },
-        { name: 'Rose Gold', hex: '#E0A96D' },
+        { name: 'Racing Green', hex: '#13d813' },
         { name: 'Diver Orange', hex: '#FF6B00' }
     ];
 
@@ -17,15 +17,15 @@ export default function UI({ setActiveColor, activeColor, viewCamera }) {
         // Subtle GSAP entrance animation for UI components
         if (uiRef.current && uiRef.current.children.length > 0) {
             const elements = uiRef.current.children;
-            gsap.fromTo(elements, 
-                { y: 30, opacity: 0 }, 
+            gsap.fromTo(elements,
+                { y: 30, opacity: 0 },
                 { y: 0, opacity: 1, duration: 1, stagger: 0.15, ease: "power3.out", delay: 0.5 }
             );
         }
     }, []);
 
     const handleColorSelect = (hex) => {
-        setActiveColor(hex); 
+        setActiveColor(hex);
         window.dispatchEvent(new CustomEvent('watchColorChanged', {
             detail: { color: hex }
         }));
